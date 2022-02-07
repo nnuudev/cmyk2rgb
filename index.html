@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--
+  *******************************************************************************
+    MIT License
+    Copyright (c) 2022 nnuudev
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+    THE SOFTWARE.
+  *******************************************************************************
+-->
+    <meta charset="utf-8" />
+    <title>cmyk2rgb</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:900" rel="stylesheet">
+    <link rel="shortcut icon" href="favicon.ico">
+    <script src="FileSaver.js"></script>
+    <style type="text/css">
+        html {
+            min-height: 100%;
+            background: linear-gradient(120deg, #ffbfbf, #f2ffbf, #b2ffbf, #b2ffff, #b2bfff);
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        #preview-row {
+            background: #eff;
+            position: relative;
+            width: auto;
+            padding: 12px;
+            border: 1px solid #ccc;
+            min-height: 125px;
+            border-radius: 2px;
+            max-width: 1200px;
+            margin: 0 auto;
+            box-shadow: 5px 5px 2.5px rgba(0,0,0,0.1);
+        }
+        #drop-target {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            height: 75px;
+            background-color: #dee;
+            border: 1px solid #ccc;
+            text-align: center;
+            padding: 37px 12px 12px 12px;
+            border-radius: 2px;
+        }
+        #preview {
+            width: 600px;
+            height: 400px;
+            margin: 140px auto 0 auto;
+            background-color: #dee;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            display: block;
+        }
+        noscript {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            right: 6px;
+            bottom: 6px;
+            background-color: #e00;
+            border: 1px solid #f77;
+            text-align: center;
+            padding: 37px 12px 12px 12px;
+            z-index: 1000;
+        }
+        .footer {
+            font-size: 6pt;
+            opacity: 0.5;
+            position: absolute;
+            right: 5px;
+            bottom: 0;
+        }
+    </style>
+</head>
+<body>
+
+<div>
+    <div id="preview-row">
+        <noscript>PLEASE ENABLE JAVASCRIPT</noscript>
+        <div id="drop-target">LOADING...</div>
+        <div id="preview">
+            <img id="palette" style="display:none" src="palCMYK.png">
+            <img id="bitmap" src="bitmap.png">
+            <canvas id="canvas" style="display:none"></canvas>
+        </div>
+        <input type="file" id="fileInput" style="display: none;">
+        <p class="footer"><a href="https://github.com/nnuudev/cmyk2rgb/blob/master/README.md" target="_top">README</a></p>
+    </div>
+
+<script>
+window.addEventListener('load', function() {
+    var target = document.body.parentNode,
+        dropTarget = document.getElementById("drop-target"),
+        preview = document.getElementById("preview"),
+        canvas = document.getElementById("canvas"),
+        palette = document.getElementById("palette"),
+        bitmap = document.getElementById("bitmap");
+
+    var ctx = canvas.getContext("2d");
+    canvas.width = palette.width;
+    canvas.height = palette.height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(palette, 0, 0, palette.width, palette.height);
+    var paletteDataData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    dropTarget.innerHTML = "CLICK HERE TO SELECT A FILE OR DROP AN IMAGE HERE<br>THE FIXED IMAGE WILL DOWNLOAD AUTOMATICALLY";
+
+    var render = function(src){
+        var img = new Image();
+        img.onload = function(){
+            var ctx = canvas.getContext("2d");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, img.width, img.height);
+            var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            var imageDataData = imageData.data;
+            for (var i = 0; i < imageDataData.length; i+=4) {
+                var input = [imageDataData[i], imageDataData[i+1], imageDataData[i+2]];
+                var pos = 4 * (input[2] + 256 * (input[1] + 256 * input[0]));
+                imageDataData[i] = paletteDataData[pos];
+                imageDataData[i+1] = paletteDataData[pos+1];
+                imageDataData[i+2] = paletteDataData[pos+2];
+            }
+            ctx.putImageData(imageData, 0, 0);
+            canvas.toBlob(function(blob) {
+                saveAs(blob, new Date().getTime() + ".png");
+            });
+            /*
+            canvas.title = "Click to download";
+            canvas.onclick = function() {
+                canvas.toBlob(function(blob) {
+                    saveAs(blob, new Date().getTime() + ".png");
+                });
+            }
+            canvas.onclick();
+            */
+            preview.style.width = img.width + "px";
+            preview.style.height = img.height + "px";
+            bitmap.style.display = "none";
+            canvas.style.display = "inline";
+            dropTarget.innerHTML = "CLICK HERE TO SELECT ANOTHER FILE<br>OR DROP ANOTHER IMAGE HERE";
+        };
+        img.src = src;
+    };
+
+    var readImage = function(imgFile){
+        if(!imgFile.type.match(/image.*/)){
+            console.log("The dropped file is not an image: ", imgFile.type);
+            return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function(e){
+            render(e.target.result);
+        };
+        reader.readAsDataURL(imgFile);
+    };
+
+    // DOMReady setup
+    target.addEventListener("dragover", function(e) {e.preventDefault();}, true);
+    target.addEventListener("dragenter", function(e) {
+        e.preventDefault();
+        document.body.parentNode.style.opacity = "0.5";
+    }, true);
+    target.addEventListener("dragexit", function(e) {
+        e.preventDefault();
+        document.body.parentNode.style.opacity = "1";
+    }, true);
+    target.addEventListener("drop", function(e){
+        e.preventDefault();
+        document.body.parentNode.style.opacity = "1";
+        readImage(e.dataTransfer.files[0]);
+    }, true);
+
+    // filepicker
+    var fileInput = document.getElementById("fileInput");
+    fileInput.addEventListener("change", function() {
+        readImage(this.files[0]);
+    }, true);
+    document.getElementById("drop-target").addEventListener("click", function() {
+        fileInput.click();
+    }, true);
+});
+</script>
+</div>
+
+</body>
+</html>
